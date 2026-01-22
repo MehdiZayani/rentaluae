@@ -203,8 +203,8 @@ export default function Home() {
               <p className="text-sm text-blue-200 mt-2">Commission only, pay on closed deals</p>
             </div>
             <div>
-              <div className="text-5xl font-bold mb-2">15min</div>
-              <div className="text-blue-100 text-lg">Full Pre-Qualification</div>
+              <div className="text-5xl font-bold mb-2">Full</div>
+              <div className="text-blue-100 text-lg">Pre-Qualification</div>
               <p className="text-sm text-blue-200 mt-2">AI + OCR = instant processing</p>
             </div>
             <div>
@@ -393,41 +393,7 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-8">
-            {/* Lead Generation */}
-            <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-3xl p-8 shadow-xl border-2 border-green-200">
-              <div className="flex items-center mb-6">
-                <div className="w-14 h-14 bg-green-600 rounded-2xl flex items-center justify-center mr-4">
-                  <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                  </svg>
-                </div>
-                <h3 className="text-2xl font-bold text-gray-900">Get More Clients</h3>
-              </div>
-              <ul className="space-y-3 text-gray-700">
-                <li className="flex items-start">
-                  <span className="text-green-600 font-bold mr-2">•</span>
-                  <span><strong>Meta Ads Management:</strong> Facebook/Instagram campaigns targeting UAE expats needing cars</span>
-                </li>
-                <li className="flex items-start">
-                  <span className="text-green-600 font-bold mr-2">•</span>
-                  <span><strong>Google Ads:</strong> Capture "rent to own car Dubai" searches with high intent</span>
-                </li>
-                <li className="flex items-start">
-                  <span className="text-green-600 font-bold mr-2">•</span>
-                  <span><strong>Influencer Partnerships:</strong> Work with UAE micro-influencers in expat communities</span>
-                </li>
-                <li className="flex items-start">
-                  <span className="text-green-600 font-bold mr-2">•</span>
-                  <span><strong>SEO Content:</strong> Blog posts, guides ranking for "no bank loan car rental UAE"</span>
-                </li>
-                <li className="flex items-start">
-                  <span className="text-green-600 font-bold mr-2">•</span>
-                  <span><strong>Referral Program:</strong> Incentivize existing customers to bring friends</span>
-                </li>
-              </ul>
-            </div>
-
+          <div className="grid md:grid-cols-1 gap-8">
             {/* Advanced Features */}
             <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-3xl p-8 shadow-xl border-2 border-orange-200">
               <div className="flex items-center mb-6">
