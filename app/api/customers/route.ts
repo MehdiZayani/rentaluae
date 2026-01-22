@@ -12,6 +12,11 @@ export async function POST(request: Request) {
         dateOfBirth: body.dateOfBirth,
         idNumber: body.idNumber,
         idType: body.idType,
+        idImageUrl: body.idImageUrl,
+        bankStatementUrl: body.bankStatementUrl,
+        status: body.status || 'New Lead',
+        trustScore: body.trustScore || 0,
+        trustScoreDetails: body.trustScoreDetails || null,
       },
     })
 

@@ -2,13 +2,14 @@
 
 import { useState, useRef } from 'react'
 import { createWorker } from 'tesseract.js'
+import { useUploadThing } from '@/lib/uploadthing'
 
 interface IDScannerProps {
   onClose: () => void
 }
 
 export default function IDScanner({ onClose }: IDScannerProps) {
-  const [step, setStep] = useState(1) // Step 1: Choose ID Type, Step 2: Scan, Step 3: Review
+  const [step, setStep] = useState(1) // Step 1: Choose ID Type, Step 2: ID Confirmation, Step 3: Bank Statement, Step 4: Review
   const [selectedIdType, setSelectedIdType] = useState('Driver License')
   const [isScanning, setIsScanning] = useState(false)
   const [scannedData, setScannedData] = useState<any>(null)
@@ -17,13 +18,34 @@ export default function IDScanner({ onClose }: IDScannerProps) {
     lastName: '',
     dateOfBirth: '',
     idNumber: '',
-    idType: 'Driver License'
+    idType: 'Driver License',
+    idImageUrl: '',
+    bankStatementUrl: '',
+    trustScore: 0,
+    trustScoreDetails: ''
   })
   const [isSaving, setIsSaving] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
+  const [isEditingExtractedData, setIsEditingExtractedData] = useState(false)
   const [scanProgress, setScanProgress] = useState(0)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [idImageUrl, setIdImageUrl] = useState('')
+  const [bankStatementUrl, setBankStatementUrl] = useState('')
+  const [trustScore, setTrustScore] = useState<number>(0)
+  const [trustScoreDetails, setTrustScoreDetails] = useState<string>('')
+  const [isAnalyzingBankStatement, setIsAnalyzingBankStatement] = useState(false)
   const cameraInputRef = useRef<HTMLInputElement>(null)
   const uploadInputRef = useRef<HTMLInputElement>(null)
+  const bankStatementCameraRef = useRef<HTMLInputElement>(null)
+  const bankStatementUploadRef = useRef<HTMLInputElement>(null)
+
+  const { startUpload: uploadId } = useUploadThing("idUploader", {
+    onUploadProgress: (p) => setUploadProgress(p),
+  })
+  
+  const { startUpload: uploadBankStatement } = useUploadThing("bankStatementUploader", {
+    onUploadProgress: (p) => setUploadProgress(p),
+  })
 
   const extractDataFromText = (text: string) => {
     // Clean and normalize the text
@@ -245,6 +267,18 @@ export default function IDScanner({ onClose }: IDScannerProps) {
     setScanProgress(0)
 
     try {
+      // Upload to UploadThing first
+      setUploadProgress(0)
+      const uploadResult = await uploadId([file])
+      
+      if (!uploadResult || uploadResult.length === 0) {
+        throw new Error('Upload failed')
+      }
+
+      const imageUrl = uploadResult[0].url
+      console.log('Image uploaded to:', imageUrl)
+      setIdImageUrl(imageUrl)
+
       // Create OCR worker
       const worker = await createWorker('eng', 1, {
         logger: (m) => {
@@ -264,19 +298,84 @@ export default function IDScanner({ onClose }: IDScannerProps) {
       const extractedData = extractDataFromText(text)
       console.log('Extracted data:', extractedData)
       
-      setFormData({ ...extractedData, idType: selectedIdType })
+      setFormData({ ...extractedData, idType: selectedIdType, idImageUrl: imageUrl })
       setScannedData(extractedData)
-      setStep(3) // Move to review step
+      // Stay on step 2 to show confirmation
       setIsScanning(false)
       setScanProgress(0)
+      setUploadProgress(0)
     } catch (error) {
       console.error('Error scanning ID:', error)
       alert('Failed to scan ID. Please try again or enter data manually.')
       setIsScanning(false)
       setScanProgress(0)
+      setUploadProgress(0)
     }
     
     // Reset the input value so the same file can be selected again
+    e.target.value = ''
+  }
+
+  const handleBankStatementUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setIsScanning(true)
+    setUploadProgress(0)
+
+    try {
+      const uploadResult = await uploadBankStatement([file])
+      
+      if (!uploadResult || uploadResult.length === 0) {
+        throw new Error('Upload failed')
+      }
+
+      const bankStatementImageUrl = uploadResult[0].url
+      console.log('Bank statement uploaded to:', bankStatementImageUrl)
+      setBankStatementUrl(bankStatementImageUrl)
+
+      setFormData(prev => ({ ...prev, bankStatementUrl: bankStatementImageUrl }))
+      setIsScanning(false)
+      setUploadProgress(0)
+
+      // Analyze bank statement with OpenAI
+      setIsAnalyzingBankStatement(true)
+      try {
+        const analysisResponse = await fetch('/api/analyze-bank-statement', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ bankStatementUrl: bankStatementImageUrl })
+        })
+
+        if (analysisResponse.ok) {
+          const analysis = await analysisResponse.json()
+          setTrustScore(analysis.trustScore)
+          const details = JSON.stringify({
+            accountBalance: analysis.accountBalance,
+            transactionRegularity: analysis.transactionRegularity,
+            incomeStability: analysis.incomeStability,
+            expenseManagement: analysis.expenseManagement,
+            recommendation: analysis.recommendation
+          })
+          setTrustScoreDetails(details)
+          setFormData(prev => ({ 
+            ...prev, 
+            trustScore: analysis.trustScore,
+            trustScoreDetails: details
+          }))
+        }
+      } catch (error) {
+        console.error('Error analyzing bank statement:', error)
+      } finally {
+        setIsAnalyzingBankStatement(false)
+      }
+    } catch (error) {
+      console.error('Error uploading bank statement:', error)
+      alert('Failed to upload bank statement. Please try again.')
+      setIsScanning(false)
+      setUploadProgress(0)
+    }
+
     e.target.value = ''
   }
 
@@ -406,14 +505,14 @@ export default function IDScanner({ onClose }: IDScannerProps) {
                   onClick={() => setStep(2)}
                   className="w-full px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white text-lg font-semibold rounded-xl hover:shadow-lg transition"
                 >
-                  Continue to Scan
+                  Continue to Scan ID
                 </button>
               </div>
             </div>
           )}
 
           {/* Step 2: Scan ID */}
-          {step === 2 && (
+          {step === 2 && !scannedData && (
             <div>
               <div className="mb-6">
                 <button
@@ -434,7 +533,20 @@ export default function IDScanner({ onClose }: IDScannerProps) {
                 <div className="border-4 border-dashed border-gray-300 rounded-2xl p-12 text-center">
                   <div className="flex flex-col items-center">
                     <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mb-4"></div>
-                    <p className="text-xl text-gray-600">Scanning ID...</p>
+                    <p className="text-xl text-gray-600">
+                      {uploadProgress > 0 && uploadProgress < 100 ? 'Uploading...' : 'Scanning ID...'}
+                    </p>
+                    {uploadProgress > 0 && uploadProgress < 100 && (
+                      <div className="w-full max-w-xs mt-4">
+                        <div className="bg-gray-200 rounded-full h-2.5">
+                          <div 
+                            className="bg-purple-600 h-2.5 rounded-full transition-all duration-300" 
+                            style={{ width: `${uploadProgress}%` }}
+                          ></div>
+                        </div>
+                        <p className="text-sm text-gray-500 mt-2">Uploading: {uploadProgress}%</p>
+                      </div>
+                    )}
                     {scanProgress > 0 && (
                       <div className="w-full max-w-xs mt-4">
                         <div className="bg-gray-200 rounded-full h-2.5">
@@ -443,7 +555,7 @@ export default function IDScanner({ onClose }: IDScannerProps) {
                             style={{ width: `${scanProgress}%` }}
                           ></div>
                         </div>
-                        <p className="text-sm text-gray-500 mt-2">{scanProgress}%</p>
+                        <p className="text-sm text-gray-500 mt-2">Processing: {scanProgress}%</p>
                       </div>
                     )}
                   </div>
@@ -509,8 +621,8 @@ export default function IDScanner({ onClose }: IDScannerProps) {
             </div>
           )}
 
-          {/* Step 3: Review Data */}
-          {step === 3 && scannedData && (
+          {/* Step 2: ID Scan Confirmation */}
+          {step === 2 && scannedData && (
             <div>
               <div className="mb-6">
                 <button
@@ -524,6 +636,238 @@ export default function IDScanner({ onClose }: IDScannerProps) {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                   </svg>
                   Scan Again
+                </button>
+              </div>
+
+              <h3 className="text-2xl font-bold text-gray-900 mb-4">ID Scanned Successfully!</h3>
+              
+              <div className="bg-green-50 border border-green-200 rounded-2xl p-4 mb-6">
+                <div className="flex items-center">
+                  <svg className="w-6 h-6 text-green-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span className="text-green-800 font-semibold">Information extracted from your {selectedIdType}</span>
+                </div>
+              </div>
+
+              {idImageUrl && (
+                <div className="mb-6">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Scanned ID Image</label>
+                  <img 
+                    src={idImageUrl} 
+                    alt="Scanned ID" 
+                    className="w-full rounded-xl border-2 border-gray-200"
+                  />
+                </div>
+              )}
+
+              <div className="bg-gray-50 rounded-2xl p-6 mb-6">
+                <div className="flex justify-between items-center mb-4">
+                  <h4 className="font-semibold text-gray-900">Extracted Information:</h4>
+                  <button
+                    onClick={() => {
+                      setIsEditingExtractedData(true)
+                      setStep(4)
+                    }}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition flex items-center gap-2"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                    Edit
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-gray-600">First Name</p>
+                    <p className="font-semibold text-gray-900">{formData.firstName || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Last Name</p>
+                    <p className="font-semibold text-gray-900">{formData.lastName || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Date of Birth</p>
+                    <p className="font-semibold text-gray-900">{formData.dateOfBirth || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">ID Number</p>
+                    <p className="font-semibold text-gray-900">{formData.idNumber || 'N/A'}</p>
+                  </div>
+                </div>
+              </div>
+
+              {!isEditingExtractedData && (
+                <button
+                  onClick={() => setStep(3)}
+                  className="w-full px-8 py-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-2xl font-bold hover:shadow-xl transition-all duration-300 hover:scale-105"
+                >
+                  Continue to Bank Statement Upload
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Step 3: Bank Statement Upload */}
+          {step === 3 && !bankStatementUrl && (
+            <div>
+              <div className="mb-6">
+                <button
+                  onClick={() => setStep(2)}
+                  className="flex items-center text-gray-600 hover:text-gray-900 transition"
+                >
+                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                  Back
+                </button>
+              </div>
+
+              <h3 className="text-2xl font-bold text-gray-900 mb-4">Upload Bank Statement</h3>
+              
+                <div>
+                  {uploadProgress > 0 && uploadProgress < 100 && (
+                    <div className="mb-6">
+                      <div className="flex justify-between text-sm text-purple-700 mb-2">
+                        <span>Uploading bank statement...</span>
+                        <span>{uploadProgress}%</span>
+                      </div>
+                      <div className="w-full bg-purple-100 rounded-full h-3 overflow-hidden">
+                        <div 
+                          className="bg-gradient-to-r from-purple-500 to-purple-600 h-3 rounded-full transition-all duration-300 ease-out"
+                          style={{ width: `${uploadProgress}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="border-4 border-dashed border-gray-300 rounded-2xl p-12 text-center mb-6">
+                    <svg className="w-20 h-20 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <p className="text-xl text-gray-700 mb-2">Upload your bank statement</p>
+                    <p className="text-sm text-gray-500">This helps us verify your financial information</p>
+                  </div>
+
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <button
+                      onClick={() => bankStatementCameraRef.current?.click()}
+                      className="group relative px-8 py-6 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-2xl font-semibold hover:shadow-xl transition-all duration-300 hover:scale-105"
+                    >
+                      <div className="flex flex-col items-center">
+                        <svg className="w-12 h-12 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        <span className="text-lg">Take a Photo</span>
+                        <span className="text-sm text-blue-100 mt-1">Use your camera</span>
+                      </div>
+                    </button>
+
+                    <button
+                      onClick={() => bankStatementUploadRef.current?.click()}
+                      className="group relative px-8 py-6 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-2xl font-semibold hover:shadow-xl transition-all duration-300 hover:scale-105"
+                    >
+                      <div className="flex flex-col items-center">
+                        <svg className="w-12 h-12 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                        </svg>
+                        <span className="text-lg">Upload Image</span>
+                        <span className="text-sm text-purple-100 mt-1">Choose from gallery</span>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              
+              {/* Hidden file inputs for bank statement */}
+              <input
+                ref={bankStatementCameraRef}
+                type="file"
+                accept="image/*"
+                capture="user"
+                onChange={handleBankStatementUpload}
+                className="hidden"
+              />
+              <input
+                ref={bankStatementUploadRef}
+                type="file"
+                accept="image/*"
+                onChange={handleBankStatementUpload}
+                className="hidden"
+              />
+            </div>
+          )}
+
+          {/* Step 3: Bank Statement Confirmation */}
+          {step === 3 && bankStatementUrl && (
+            <div>
+              <div className="mb-6">
+                <button
+                  onClick={() => {
+                    setStep(3)
+                    setBankStatementUrl('')
+                  }}
+                  className="flex items-center text-gray-600 hover:text-gray-900 transition"
+                >
+                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                  Upload Another
+                </button>
+              </div>
+
+              <h3 className="text-2xl font-bold text-gray-900 mb-4">Bank Statement Uploaded ✓</h3>
+              
+              <div className="bg-green-50 border border-green-200 rounded-2xl p-4 mb-6">
+                <div className="flex items-center">
+                  <svg className="w-6 h-6 text-green-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span className="text-green-800 font-semibold">Bank statement uploaded successfully!</span>
+                </div>
+              </div>
+              
+              <div className="mb-6">
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Bank Statement Image</label>
+                <img 
+                  src={bankStatementUrl} 
+                  alt="Bank Statement" 
+                  className="w-full rounded-xl border-2 border-gray-200"
+                />
+              </div>
+
+              {/* AI Analysis Loading (hidden from client, but runs in background) */}
+              {isAnalyzingBankStatement && (
+                <div className="mb-6 bg-blue-50 border border-blue-200 rounded-2xl p-6">
+                  <div className="flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-4 border-blue-600 mr-3"></div>
+                    <p className="text-blue-800 font-semibold">Processing bank statement...</p>
+                  </div>
+                </div>
+              )}
+
+              <button
+                onClick={() => setStep(4)}
+                disabled={isAnalyzingBankStatement}
+                className="w-full px-8 py-4 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-2xl font-bold hover:shadow-xl transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Continue to Review
+              </button>
+            </div>
+          )}
+
+          {/* Step 4: Review Data */}
+          {step === 4 && scannedData && (
+            <div>
+              <div className="mb-6">
+                <button
+                  onClick={() => setStep(3)}
+                  className="flex items-center text-gray-600 hover:text-gray-900 transition"
+                >
+                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                  Back
                 </button>
               </div>
 
@@ -598,22 +942,68 @@ export default function IDScanner({ onClose }: IDScannerProps) {
                 </div>
               </div>
 
+              {/* Uploaded Images Section */}
+              {(idImageUrl || bankStatementUrl) && (
+                <div className="mt-8">
+                  <h4 className="text-lg font-bold text-gray-900 mb-4">Uploaded Documents</h4>
+                  <div className="grid md:grid-cols-2 gap-6">
+                    {idImageUrl && (
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">ID Document</label>
+                        <div className="relative rounded-xl overflow-hidden border-2 border-gray-200">
+                          <img 
+                            src={idImageUrl} 
+                            alt="ID Document" 
+                            className="w-full h-48 object-cover"
+                          />
+                        </div>
+                      </div>
+                    )}
+                    {bankStatementUrl && (
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">Bank Statement</label>
+                        <div className="relative rounded-xl overflow-hidden border-2 border-gray-200">
+                          <img 
+                            src={bankStatementUrl} 
+                            alt="Bank Statement" 
+                            className="w-full h-48 object-cover"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               <div className="flex gap-4 mt-8">
                 <button
                   onClick={() => {
-                    setStep(2)
-                    setScannedData(null)
+                    if (isEditingExtractedData) {
+                      setStep(2)
+                    } else {
+                      setStep(2)
+                      setScannedData(null)
+                    }
                   }}
                   className="flex-1 px-6 py-4 border-2 border-gray-300 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition"
                 >
-                  Scan Another ID
+                  {isEditingExtractedData ? 'Cancel' : 'Scan Another ID'}
                 </button>
                 <button
-                  onClick={handleSave}
+                  onClick={() => {
+                    if (isEditingExtractedData) {
+                      // Save changes and go back to confirmation
+                      setIsEditingExtractedData(false)
+                      setScannedData(formData)
+                      setStep(2)
+                    } else {
+                      handleSave()
+                    }
+                  }}
                   disabled={isSaving}
                   className="flex-1 px-6 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-semibold hover:shadow-lg transition disabled:opacity-50"
                 >
-                  {isSaving ? 'Saving...' : 'Save to Database'}
+                  {isEditingExtractedData ? 'Save Changes' : (isSaving ? 'Saving...' : 'Save to Database')}
                 </button>
               </div>
             </div>
