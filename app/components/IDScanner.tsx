@@ -279,8 +279,11 @@ export default function IDScanner({ onClose }: IDScannerProps) {
       console.log('Image uploaded to:', imageUrl)
       setIdImageUrl(imageUrl)
 
-      // Create OCR worker
+      // Create OCR worker with Vercel-compatible configuration
       const worker = await createWorker('eng', 1, {
+        workerPath: 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/worker.min.js',
+        langPath: 'https://tessdata.projectnaptha.com/4.0.0',
+        corePath: 'https://cdn.jsdelivr.net/npm/tesseract.js-core@5/tesseract-core.wasm.js',
         logger: (m) => {
           if (m.status === 'recognizing text') {
             setScanProgress(Math.round(m.progress * 100))
