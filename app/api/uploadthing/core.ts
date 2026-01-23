@@ -8,7 +8,10 @@ export const ourFileRouter = {
       console.log("ID uploaded:", file.url);
       return { url: file.url };
     }),
-  bankStatementUploader: f({ image: { maxFileSize: "4MB", maxFileCount: 1 } })
+  bankStatementUploader: f({ 
+    image: { maxFileSize: "8MB", maxFileCount: 1 },
+    pdf: { maxFileSize: "8MB", maxFileCount: 1 }
+  })
     .onUploadComplete(async ({ file }) => {
       console.log("Bank statement uploaded:", file.url);
       return { url: file.url };

@@ -775,8 +775,8 @@ export default function IDScanner({ onClose }: IDScannerProps) {
                         <svg className="w-12 h-12 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                         </svg>
-                        <span className="text-lg">Upload Image</span>
-                        <span className="text-sm text-purple-100 mt-1">Choose from gallery</span>
+                        <span className="text-lg">Upload File</span>
+                        <span className="text-sm text-purple-100 mt-1">Image or PDF</span>
                       </div>
                     </button>
                   </div>
@@ -786,7 +786,7 @@ export default function IDScanner({ onClose }: IDScannerProps) {
               <input
                 ref={bankStatementCameraRef}
                 type="file"
-                accept="image/*"
+                accept="image/*,application/pdf"
                 capture="user"
                 onChange={handleBankStatementUpload}
                 className="hidden"
@@ -794,7 +794,7 @@ export default function IDScanner({ onClose }: IDScannerProps) {
               <input
                 ref={bankStatementUploadRef}
                 type="file"
-                accept="image/*"
+                accept="image/*,application/pdf"
                 onChange={handleBankStatementUpload}
                 className="hidden"
               />
@@ -831,12 +831,44 @@ export default function IDScanner({ onClose }: IDScannerProps) {
               </div>
               
               <div className="mb-6">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Bank Statement Image</label>
-                <img 
-                  src={bankStatementUrl} 
-                  alt="Bank Statement" 
-                  className="w-full rounded-xl border-2 border-gray-200"
-                />
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Bank Statement</label>
+                {bankStatementUrl.toLowerCase().endsWith('.pdf') ? (
+                  <div className="border-2 border-gray-200 rounded-xl p-8 bg-gray-50">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center">
+                        <svg className="w-12 h-12 text-red-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                        </svg>
+                        <div>
+                          <p className="font-semibold text-gray-900">PDF Document</p>
+                          <p className="text-sm text-gray-500">Bank Statement</p>
+                        </div>
+                      </div>
+                      <a
+                        href={bankStatementUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition flex items-center gap-2"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                        Open PDF
+                      </a>
+                    </div>
+                    <iframe
+                      src={bankStatementUrl}
+                      className="w-full h-96 rounded-lg"
+                      title="Bank Statement PDF"
+                    />
+                  </div>
+                ) : (
+                  <img 
+                    src={bankStatementUrl} 
+                    alt="Bank Statement" 
+                    className="w-full rounded-xl border-2 border-gray-200"
+                  />
+                )}
               </div>
 
               {/* AI Analysis Loading (hidden from client, but runs in background) */}
