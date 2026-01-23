@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import IDScanner from './components/IDScanner'
+import VoiceAgent from './components/VoiceAgent'
 
 export default function Home() {
   const [showScanner, setShowScanner] = useState(false)
@@ -58,7 +59,16 @@ export default function Home() {
             </span>
             <div className="absolute inset-0 bg-gradient-to-r from-purple-600 to-blue-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
           </button>
-          <p className="text-sm text-gray-500">↑ This is what your leads will see</p>
+          <p className="text-sm text-gray-500 mb-6">↑ This is what your leads will see</p>
+          
+          {/* Voice Agent Demo */}
+          <div className="mt-6">
+            <VoiceAgent 
+              assistantId="017aa5b0-5f96-49f0-9249-a557724c95bc"
+              publicKey={process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY || ''}
+            />
+            <p className="text-sm text-gray-500 mt-2">↑ Try our AI voice assistant demo</p>
+          </div>
         </div>
 
         {/* How It Works Section */}
@@ -449,7 +459,7 @@ export default function Home() {
             <p className="text-xl text-blue-100 mb-8">
               See the full system in action. Try the demo as a client would experience it, then check the admin dashboard to see the qualified lead data.
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <div className="flex flex-col sm:flex-row gap-4 justify-center mb-6">
               <button
                 onClick={() => setShowScanner(true)}
                 className="px-8 py-4 bg-white text-blue-600 rounded-2xl font-bold hover:shadow-xl transition-all duration-300 hover:scale-105"
@@ -463,6 +473,15 @@ export default function Home() {
                 View Admin Dashboard
               </a>
             </div>
+            <a
+              href="/automation-flow"
+              className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-purple-700 to-pink-700 text-white rounded-2xl font-bold hover:shadow-xl transition-all duration-300 hover:scale-105"
+            >
+              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+              See Complete Automation Flow
+            </a>
             <p className="text-sm text-blue-200 mt-6">
               📅 Technical Call: Today, Jan 22 at 11:00 AM Dubai Time
             </p>
